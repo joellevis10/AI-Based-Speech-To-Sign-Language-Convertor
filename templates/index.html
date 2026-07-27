@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignSync AI | Speech-to-Sign</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top left, #f8fafc, #e2e8f0);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .output-container {
+            aspect-ratio: 16/9;
+            background: #0f172a;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .pulse-ring {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .5; transform: scale(1.1); }
+        }
+
+        .chip-active {
+            background: #4f46e5 !important;
+            color: white !important;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style> -->
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto h-full flex flex-col gap-6">
+        
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                    <!-- <i data-lucide="waves" class="text-indigo-600"></i> -->
+                    Sign Language Converter <span class="text-indigo-600">AI</span>
+                </h1>
+                <p class="text-slate-500 font-medium">Next-gen Speech to ASL Translation</p>
+            </div>
+            <!-- <div class="flex items-center gap-3">
+                <div class="glass px-4 py-2 rounded-2xl flex items-center gap-2">
+                     <span id="serverStatus" class="w-2 h-2 rounded-full bg-emerald-500"></span> -->
+                    <!-- <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Flask + SpaCy</span> 
+                </div>
+            </div> -->
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Main Content: Sign Viewer (Center/Left) -->
+            <main class="lg:col-span-8 flex flex-col gap-6">
+                <div class="output-container relative rounded-3xl overflow-hidden group">
+                    <!-- Overlay Controls -->
+                    <div class="absolute top-4 left-4 z-10">
+                        <span id="currentWordLabel" class="glass px-4 py-2 rounded-xl text-indigo-700 font-extrabold uppercase text-sm tracking-widest opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            READY
+                        </span>
+                    </div>
+
+                    <!-- Placeholder/GIF -->
+                    <div class="w-full h-full flex items-center justify-center bg-slate-900 overflow-hidden">
+                        <img id="signGif" src="" alt="" class="max-w-full max-h-full object-contain hidden" />
+                        <div id="emptyState" class="text-center">
+                            <i data-lucide="hand" class="w-20 h-20 text-slate-700 mx-auto mb-4 opacity-20"></i>
+                            <p class="text-slate-600 font-semibold italic">Awaiting Voice or Text Input...</p>
+                        </div>
+                        <div id="fallbackText" class="text-white text-6xl font-black glow-text hidden uppercase"></div>
+                    </div>
+
+                    <!-- Bottom Status Bar -->
+                    <div class="absolute bottom-0 w-full glass border-t-0 p-4 flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div id="micIndicator" class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center transition-all duration-300">
+                                <i id="micIndicatorIcon" data-lucide="mic" class="w-5 h-5 text-slate-500"></i>
+                            </div>
+                            <div>
+                                <p id="statusMsg" class="text-xs font-bold text-slate-400 uppercase tracking-tighter">Standby</p>
+                                <p id="textOut" class="text-sm font-semibold text-slate-800 line-clamp-1">---</p>
+                            </div>
+                        </div>
+                        <div id="playbackProgress" class="h-1 w-24 bg-slate-200 rounded-full overflow-hidden">
+                            <div id="progressBar" class="h-full bg-indigo-600 w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chips Section (Visualizer) -->
+                <div class="glass rounded-3xl p-6">
+                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i data-lucide="binary" class="w-4 h-4"></i>
+                        Deconstructed Sequence
+                    </h3>
+                    <div id="chipsContainer" class="flex flex-wrap gap-3 min-h-[60px]">
+                        <p class="text-slate-400 italic text-sm">Processed words will appear here...</p>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Sidebar: Controls (Right) -->
+            <aside class="lg:col-span-4 flex flex-col gap-6">
+                
+                <div class="glass rounded-3xl p-6 shadow-sm">
+                    <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <i data-lucide="command" class="w-5 h-5 text-indigo-600"></i>
+                        Command Center
+                    </h2>
+
+                    <!-- Action Buttons -->
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <button onclick="toggleMic()" id="micBtn" class="flex flex-col items-center justify-center p-4 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 group">
+                            <i id="micBtnIcon" data-lucide="mic" class="w-6 h-6 mb-2 group-hover:scale-110 transition-transform"></i>
+                            <span id="micBtnText" class="text-xs font-bold">Start Listening</span>
+                        </button>
+                        <button onclick="processManual()" class="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-900 text-white hover:bg-black transition-all shadow-lg group">
+                            <i data-lucide="play" class="w-6 h-6 mb-2 group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-bold">Process Text</span>
+                        </button>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="space-y-4">
+                        <div class="relative">
+                            <input id="manualText" type="text" placeholder="Type a sentence..." 
+                                class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-12 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium text-slate-700">
+                            <button onclick="clearText()" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                <i data-lucide="x-circle" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+
+                        <!-- Timing Control Slider -->
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div class="flex justify-between mb-2">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sign Duration</label>
+                                <span id="timingVal" class="text-[10px] font-bold text-indigo-600">3.0s</span>
+                            </div>
+                            <input type="range" id="timingSlider" min="1000" max="6000" step="100" value="3000" oninput="updateTimingLabel(this.value)">
+                            <div class="flex justify-between mt-1 text-[9px] text-slate-400 font-medium">
+                                <span>Fast</span>
+                                <span>Slow</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                            <div class="flex gap-3">
+                                <i data-lucide="info" class="w-5 h-5 text-indigo-500 shrink-0"></i>
+                                <p class="text-xs text-indigo-700 leading-relaxed font-medium">
+                                    Try: <span class="cursor-pointer font-bold underline decoration-indigo-300" onclick="quickFill('Hello everyone today celebration')">"Hello everyone today celebration"</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass rounded-3xl p-6 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">System Log</h3>
+                    <div id="log" class="text-[11px] font-mono text-slate-500 space-y-2 max-h-[120px] overflow-y-auto custom-scrollbar">
+                        <p>> System initialized.</p>
+                        <p>> Speech engine ready.</p>
+                    </div>
+                </div>
+
+            </aside>
+        </div>
+
+        <footer class="mt-auto py-6 text-center text-slate-400 text-xs font-medium">
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+</body>
+</html>
